@@ -1,35 +1,39 @@
 import google.generativeai as genai
+import PyPDF2
 
-GEMINI_API_KEY = 'AIzaSyBnPwj1Z9hMZGCsooqR4JlxlG1VCT3Tykk'
-
-class GeminiChatBot:
-    
-    def __init__(self, api_key, model_name="gemini-1.5-flash"):
-        """
-        Initialize the GeminiChatBot
-
-        Args:
-            api_key (str): API Key for Gemini
-            api_url (str): The Base URL for the Gemini API
-
-        """
+class CustomGeminiChatBot:
+    def __init__(self, api_key, model_name="gemini-1.5-flash", resume_path=None, linkedin_url=None):
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel(model_name)
+        self.resume_text = self._parse_resume(resume_path) if resume_path else ""
+        self.linkedin_url = linkedin_url
+
+    def _parse_resume(self, resume_path):
+        """Extract text from the resume PDF."""
+        try:
+            with open(resume_path, 'rb') as file:
+                reader = PyPDF2.PdfReader(file)
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text()
+                return text
+        except Exception as e:
+            return f"Error reading resume: {str(e)}"
+
+    def generate_context(self):
+        """Generate context for the chatbot."""
+        context = "This chatbot answers questions about Arpit Shrotriya's professional background.\n\n"
+        context += f"Resume:\n{self.resume_text[:1000]}\n\n"  # Include a snippet of the resume
+        context += f"LinkedIn Profile: {self.linkedin_url}\n"
+        return context
 
     def respond(self, user_input):
-        """
-        Generate a response to the user input using the Gemini Model.
-
-        Args:
-            user_input (str): The User's Input/question.
-
-        Returns:
-            str : The chatbot's response
-        
-        """
-        
+        """Generate a response from the Gemini model."""
         try:
-            response = self.model.generate_content(user_input)
+            # Prepend context to the user input
+            context = self.generate_context()
+            prompt = f"{context}\nUser: {user_input}\nBot:"
+            response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
             return f"Error: {str(e)}"
